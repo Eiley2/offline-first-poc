@@ -1,0 +1,24 @@
+{
+  "projectName": "offline-first",
+  "mode": "file-router",
+  "typescript": true,
+  "packageManager": "bun",
+  "tailwind": true,
+  "addOnOptions": {
+    "drizzle": {
+      "database": "postgresql"
+    }
+  },
+  "git": true,
+  "version": 1,
+  "framework": "react-cra",
+  "chosenAddOns": [
+    "nitro",
+    "start",
+    "db",
+    "drizzle",
+    "form",
+    "tanstack-query",
+    "better-auth"
+  ]
+}
