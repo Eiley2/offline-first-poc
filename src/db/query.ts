@@ -6,7 +6,7 @@ import {
 } from "@tanstack/react-start";
 import { db } from ".";
 import { dexieDb } from "@/lib/dexie";
-import { todos } from "./schema";
+import { posts, todos } from "./schema";
 
 export const getTodosFromServer = createServerFn({
   method: "GET",
@@ -166,6 +166,61 @@ export const getPostContents = createIsomorphicFn()
   .client(getPostContentsFromClient)
   .server(getPostContentsFromServer);
 
+// Insert post to server
+export const insertPostToServer = createServerFn({
+  method: "POST",
+})
+  .inputValidator((data: { title: string; createdAt: string }) => data)
+  .handler(async ({ data }) => {
+    await db.insert(posts).values({
+      title: data.title,
+      createdAt: new Date(data.createdAt),
+    });
+    return { success: true };
+  });
+
+// Sync posts from client to server (client → server)
+export const syncPostsToServer = createClientOnlyFn(async () => {
+  const clientPosts = await dexieDb.posts.toArray();
+  const serverPosts = await getPostsFromServer();
+
+  // If no client posts, nothing to sync
+  if (clientPosts.length === 0) {
+    return { synced: false, reason: "no_client_posts", count: 0 };
+  }
+
+  // Find posts that exist on client but not on server
+  const postsToSync = clientPosts.filter((clientPost) => {
+    return !serverPosts.some(
+      (serverPost) =>
+        serverPost.title === clientPost.title &&
+        serverPost.createdAt?.getTime() === clientPost.createdAt.getTime()
+    );
+  });
+
+  if (postsToSync.length === 0) {
+    return { synced: false, reason: "already_in_sync", count: 0 };
+  }
+
+  // Sort from oldest to newest
+  const sortedPosts = postsToSync.sort(
+    (a, b) => a.createdAt.getTime() - b.createdAt.getTime()
+  );
+
+  // Insert each post to server (oldest first)
+  for (const post of sortedPosts) {
+    await insertPostToServer({
+      data: {
+        title: post.title,
+        createdAt: post.createdAt.toISOString(),
+      },
+    });
+  }
+
+  return { synced: true, count: sortedPosts.length, posts: sortedPosts };
+});
+
+// Sync posts from server to client (server → client)
 export const syncOnConnect = createClientOnlyFn(async () => {
   const clientPosts = await dexieDb.posts.toArray();
   const serverPosts = await getPostsFromServer();
