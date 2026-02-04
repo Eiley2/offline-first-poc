@@ -1,24 +1,33 @@
-import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
 
-export const todos = pgTable("todos", {
-  id: uuid().primaryKey().defaultRandom(),
-  title: text().notNull(),
-  createdAt: timestamp().defaultNow(),
+export const todos = sqliteTable("todos", {
+  id: text("id").primaryKey(),
+  title: text("title").notNull(),
+  completed: integer("completed", { mode: "boolean" }).notNull().default(false),
+  createdAt: integer("createdAt", { mode: "timestamp" }).$defaultFn(
+    () => new Date()
+  ),
 });
 
-export const posts = pgTable("posts", {
-  id: uuid().primaryKey().defaultRandom(),
-  title: text().notNull(),
-  createdAt: timestamp().defaultNow(),
+export type Todo = typeof todos.$inferSelect;
+
+export const posts = sqliteTable("posts", {
+  id: text("id").primaryKey(),
+  title: text("title").notNull(),
+  createdAt: integer("createdAt", { mode: "timestamp" }).$defaultFn(
+    () => new Date()
+  ),
 });
 
 export type Post = typeof posts.$inferSelect;
 
-export const postContents = pgTable("post_contents", {
-  id: uuid().primaryKey().defaultRandom(),
-  postId: uuid().references(() => posts.id),
-  content: text().notNull(),
-  createdAt: timestamp().defaultNow(),
+export const postContents = sqliteTable("post_contents", {
+  id: text("id").primaryKey(),
+  postId: text("postId").references(() => posts.id),
+  content: text("content").notNull(),
+  createdAt: integer("createdAt", { mode: "timestamp" }).$defaultFn(
+    () => new Date()
+  ),
 });
 
 export type PostContent = typeof postContents.$inferSelect;

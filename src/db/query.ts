@@ -7,6 +7,8 @@ import {
 import { db } from ".";
 import { dexieDb } from "@/lib/dexie";
 import { posts, todos } from "./schema";
+import { ulid } from "ulid";
+import { eq } from "drizzle-orm";
 
 export const getTodosFromServer = createServerFn({
   method: "GET",
@@ -24,11 +26,24 @@ export const getTodos = createIsomorphicFn()
 
 export const addTodo = createIsomorphicFn()
   .client(async (title: string) => {
-    const todo = await dexieDb.todos.add({ title, createdAt: new Date() });
-    return todo;
+    const id = ulid();
+    await dexieDb.todos.add({
+      id,
+      title,
+      completed: false,
+      createdAt: new Date(),
+    });
+    return id;
   })
   .server(async (title: string) => {
-    return db.insert(todos).values({ title, createdAt: new Date() });
+    const id = ulid();
+    await db.insert(todos).values({
+      id,
+      title,
+      completed: false,
+      createdAt: new Date(),
+    });
+    return id;
   });
 
 export const getLatestTodo = createMiddleware({
@@ -71,61 +86,145 @@ export const getLatestTodoFromClient = createClientOnlyFn(async () => {
   )[0];
 });
 
-// Insert todo to server
-// Note: createdAt is sent as ISO string because Date objects can't be serialized
+// Insert todo to server with ULID
 export const insertTodoToServer = createServerFn({
   method: "POST",
 })
-  .inputValidator((data: { title: string; createdAt: string }) => data)
+  .inputValidator(
+    (data: {
+      id: string;
+      title: string;
+      completed: boolean;
+      createdAt: string;
+    }) => data
+  )
   .handler(async ({ data }) => {
     await db.insert(todos).values({
+      id: data.id,
       title: data.title,
+      completed: data.completed,
       createdAt: new Date(data.createdAt),
     });
     return { success: true };
   });
 
-// Sync function: when going from offline to online
-// Syncs all todos from client that don't exist on server (oldest to newest)
-export const syncOnReconnect = createClientOnlyFn(async () => {
+// Update todo completed status on server
+export const updateTodoCompletedOnServer = createServerFn({
+  method: "POST",
+})
+  .inputValidator((data: { id: string; completed: boolean }) => data)
+  .handler(async ({ data }) => {
+    await db
+      .update(todos)
+      .set({ completed: data.completed })
+      .where(eq(todos.id, data.id));
+    return { success: true };
+  });
+
+// Update todo completed status (client-side)
+export const updateTodoCompleted = createClientOnlyFn(
+  async (id: string, completed: boolean) => {
+    console.log(`[updateTodoCompleted] Updating ${id} to ${completed}`);
+
+    // Always update in Dexie first (works offline)
+    await dexieDb.todos.update(id, { completed });
+    console.log(`[updateTodoCompleted] ✅ Local update successful`);
+
+    // Try to update on server (will fail silently if offline)
+    try {
+      await updateTodoCompletedOnServer({ data: { id, completed } });
+      console.log(`[updateTodoCompleted] ✅ Server update successful`);
+    } catch (error) {
+      console.log(
+        `[updateTodoCompleted] ⚠️ Server update failed (offline?):`,
+        error
+      );
+      // This is OK - the pending change will be synced later
+    }
+  }
+);
+
+// Sync function with LOCAL-FIRST strategy for approvals
+// When reconnecting: local approvals are pushed to server (LOCAL WINS)
+export const syncTodosWithServerPriority = createClientOnlyFn(async () => {
   const clientTodos = await dexieDb.todos.toArray();
   const serverTodos = await getTodosFromServer();
 
-  // If no client todos, nothing to sync
-  if (clientTodos.length === 0) {
-    return { synced: false, reason: "no_client_todos", count: 0 };
-  }
+  let syncedCount = 0;
 
-  // Find todos that exist on client but not on server
-  // Compare by title and createdAt timestamp
-  const todosToSync = clientTodos.filter((clientTodo) => {
-    return !serverTodos.some(
-      (serverTodo) =>
-        serverTodo.title === clientTodo.title &&
-        serverTodo.createdAt?.getTime() === clientTodo.createdAt.getTime()
-    );
-  });
-
-  if (todosToSync.length === 0) {
-    return { synced: false, reason: "already_in_sync", count: 0 };
-  }
-
-  // Sort from oldest to newest
-  const sortedTodos = todosToSync.sort(
-    (a, b) => a.createdAt.getTime() - b.createdAt.getTime()
+  // Step 1: Sync new todos from client to server (todos that don't exist on server)
+  const newClientTodos = clientTodos.filter(
+    (clientTodo) =>
+      !serverTodos.some((serverTodo) => serverTodo.id === clientTodo.id)
   );
 
-  // Insert each todo to server (oldest first)
-  for (const todo of sortedTodos) {
-    await insertTodoToServer({
-      data: {
-        title: todo.title,
-        createdAt: todo.createdAt.toISOString(),
-      },
-    });
+  for (const todo of newClientTodos) {
+    try {
+      await insertTodoToServer({
+        data: {
+          id: todo.id,
+          title: todo.title,
+          completed: todo.completed ?? false,
+          createdAt: todo.createdAt.toISOString(),
+        },
+      });
+      syncedCount++;
+    } catch (error) {
+      console.error("Failed to sync todo to server:", error);
+    }
   }
 
-  return { synced: true, count: sortedTodos.length, todos: sortedTodos };
+  // Step 2: Sync todos from server to client
+  // For todos that only exist on server: add to client
+  const newServerTodos = serverTodos.filter(
+    (serverTodo) =>
+      !clientTodos.some((clientTodo) => clientTodo.id === serverTodo.id)
+  );
+
+  // Add new server todos to client
+  for (const todo of newServerTodos) {
+    try {
+      await dexieDb.todos.add({
+        id: todo.id,
+        title: todo.title,
+        completed: todo.completed ?? false,
+        createdAt: todo.createdAt ?? new Date(),
+      });
+      syncedCount++;
+    } catch (error) {
+      console.error("Failed to add server todo to client:", error);
+    }
+  }
+
+  // Step 3: For existing todos, push LOCAL changes to SERVER (LOCAL WINS)
+  const existingTodos = serverTodos.filter((serverTodo) =>
+    clientTodos.some((clientTodo) => clientTodo.id === serverTodo.id)
+  );
+
+  for (const serverTodo of existingTodos) {
+    const clientTodo = clientTodos.find((ct) => ct.id === serverTodo.id);
+    if (clientTodo && clientTodo.completed !== serverTodo.completed) {
+      // LOCAL WINS: Push local approval state to server
+      try {
+        await updateTodoCompletedOnServer({
+          data: {
+            id: clientTodo.id,
+            completed: clientTodo.completed ?? false,
+          },
+        });
+        syncedCount++;
+      } catch (error) {
+        console.error("Failed to sync local approval to server:", error);
+      }
+    }
+  }
+
+  return {
+    synced: syncedCount > 0,
+    count: syncedCount,
+    newFromClient: newClientTodos.length,
+    newFromServer: newServerTodos.length,
+  };
 });
 
 export const getPostsFromServer = createServerFn({
@@ -166,13 +265,16 @@ export const getPostContents = createIsomorphicFn()
   .client(getPostContentsFromClient)
   .server(getPostContentsFromServer);
 
-// Insert post to server
+// Insert post to server with ULID
 export const insertPostToServer = createServerFn({
   method: "POST",
 })
-  .inputValidator((data: { title: string; createdAt: string }) => data)
+  .inputValidator(
+    (data: { id: string; title: string; createdAt: string }) => data
+  )
   .handler(async ({ data }) => {
     await db.insert(posts).values({
+      id: data.id,
       title: data.title,
       createdAt: new Date(data.createdAt),
     });
@@ -194,7 +296,8 @@ export const syncPostsToServer = createClientOnlyFn(async () => {
     return !serverPosts.some(
       (serverPost) =>
         serverPost.title === clientPost.title &&
-        serverPost.createdAt?.getTime() === clientPost.createdAt.getTime()
+        serverPost.createdAt?.getTime() ===
+          (clientPost.createdAt ?? new Date()).getTime()
     );
   });
 
@@ -204,15 +307,18 @@ export const syncPostsToServer = createClientOnlyFn(async () => {
 
   // Sort from oldest to newest
   const sortedPosts = postsToSync.sort(
-    (a, b) => a.createdAt.getTime() - b.createdAt.getTime()
+    (a, b) =>
+      (a.createdAt ?? new Date()).getTime() -
+      (b.createdAt ?? new Date()).getTime()
   );
 
   // Insert each post to server (oldest first)
   for (const post of sortedPosts) {
     await insertPostToServer({
       data: {
+        id: post.id,
         title: post.title,
-        createdAt: post.createdAt.toISOString(),
+        createdAt: (post.createdAt ?? new Date()).toISOString(),
       },
     });
   }

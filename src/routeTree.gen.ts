@@ -10,8 +10,11 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LocalRouteImport } from './routes/local'
+import { Route as DemoRouteRouteImport } from './routes/demo/route'
 import { Route as SyncedRouteRouteImport } from './routes/_synced/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as DemoIndexRouteImport } from './routes/demo/index'
+import { Route as DemoApprovalsRouteImport } from './routes/demo/approvals'
 import { Route as SyncedServerRouteImport } from './routes/_synced/server'
 import { Route as SyncedClientRouteImport } from './routes/_synced/client'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
@@ -19,6 +22,11 @@ import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 const LocalRoute = LocalRouteImport.update({
   id: '/local',
   path: '/local',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DemoRouteRoute = DemoRouteRouteImport.update({
+  id: '/demo',
+  path: '/demo',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SyncedRouteRoute = SyncedRouteRouteImport.update({
@@ -29,6 +37,16 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const DemoIndexRoute = DemoIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => DemoRouteRoute,
+} as any)
+const DemoApprovalsRoute = DemoApprovalsRouteImport.update({
+  id: '/approvals',
+  path: '/approvals',
+  getParentRoute: () => DemoRouteRoute,
 } as any)
 const SyncedServerRoute = SyncedServerRouteImport.update({
   id: '/server',
@@ -48,9 +66,12 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/demo': typeof DemoRouteRouteWithChildren
   '/local': typeof LocalRoute
   '/client': typeof SyncedClientRoute
   '/server': typeof SyncedServerRoute
+  '/demo/approvals': typeof DemoApprovalsRoute
+  '/demo/': typeof DemoIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesByTo {
@@ -58,35 +79,59 @@ export interface FileRoutesByTo {
   '/local': typeof LocalRoute
   '/client': typeof SyncedClientRoute
   '/server': typeof SyncedServerRoute
+  '/demo/approvals': typeof DemoApprovalsRoute
+  '/demo': typeof DemoIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_synced': typeof SyncedRouteRouteWithChildren
+  '/demo': typeof DemoRouteRouteWithChildren
   '/local': typeof LocalRoute
   '/_synced/client': typeof SyncedClientRoute
   '/_synced/server': typeof SyncedServerRoute
+  '/demo/approvals': typeof DemoApprovalsRoute
+  '/demo/': typeof DemoIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/local' | '/client' | '/server' | '/api/auth/$'
+  fullPaths:
+    | '/'
+    | '/demo'
+    | '/local'
+    | '/client'
+    | '/server'
+    | '/demo/approvals'
+    | '/demo/'
+    | '/api/auth/$'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/local' | '/client' | '/server' | '/api/auth/$'
+  to:
+    | '/'
+    | '/local'
+    | '/client'
+    | '/server'
+    | '/demo/approvals'
+    | '/demo'
+    | '/api/auth/$'
   id:
     | '__root__'
     | '/'
     | '/_synced'
+    | '/demo'
     | '/local'
     | '/_synced/client'
     | '/_synced/server'
+    | '/demo/approvals'
+    | '/demo/'
     | '/api/auth/$'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SyncedRouteRoute: typeof SyncedRouteRouteWithChildren
+  DemoRouteRoute: typeof DemoRouteRouteWithChildren
   LocalRoute: typeof LocalRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
@@ -98,6 +143,13 @@ declare module '@tanstack/react-router' {
       path: '/local'
       fullPath: '/local'
       preLoaderRoute: typeof LocalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/demo': {
+      id: '/demo'
+      path: '/demo'
+      fullPath: '/demo'
+      preLoaderRoute: typeof DemoRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_synced': {
@@ -113,6 +165,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/demo/': {
+      id: '/demo/'
+      path: '/'
+      fullPath: '/demo/'
+      preLoaderRoute: typeof DemoIndexRouteImport
+      parentRoute: typeof DemoRouteRoute
+    }
+    '/demo/approvals': {
+      id: '/demo/approvals'
+      path: '/approvals'
+      fullPath: '/demo/approvals'
+      preLoaderRoute: typeof DemoApprovalsRouteImport
+      parentRoute: typeof DemoRouteRoute
     }
     '/_synced/server': {
       id: '/_synced/server'
@@ -152,9 +218,24 @@ const SyncedRouteRouteWithChildren = SyncedRouteRoute._addFileChildren(
   SyncedRouteRouteChildren,
 )
 
+interface DemoRouteRouteChildren {
+  DemoApprovalsRoute: typeof DemoApprovalsRoute
+  DemoIndexRoute: typeof DemoIndexRoute
+}
+
+const DemoRouteRouteChildren: DemoRouteRouteChildren = {
+  DemoApprovalsRoute: DemoApprovalsRoute,
+  DemoIndexRoute: DemoIndexRoute,
+}
+
+const DemoRouteRouteWithChildren = DemoRouteRoute._addFileChildren(
+  DemoRouteRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SyncedRouteRoute: SyncedRouteRouteWithChildren,
+  DemoRouteRoute: DemoRouteRouteWithChildren,
   LocalRoute: LocalRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }

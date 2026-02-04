@@ -1,21 +1,24 @@
 import { getPostsFromServer, insertPostToServer } from "@/db/query";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { dexieDb } from "@/lib/dexie";
+import { ulid } from "ulid";
 
 export const Route = createFileRoute("/_synced/server")({
   component: RouteComponent,
   loader: () => getPostsFromServer(),
-  ssr: "data-only"
+  ssr: "data-only",
 });
 
 // Client function to add post (to dexieDb and server if online)
 export const addPost = async (title: string) => {
   const createdAt = new Date();
+  const id = ulid();
 
   // Always save to dexieDb (local storage)
-  const postId = await dexieDb.posts.add({
+  await dexieDb.posts.add({
+    id,
     title,
-    createdAt
+    createdAt,
   });
 
   // If online, also save to server
@@ -24,6 +27,7 @@ export const addPost = async (title: string) => {
     try {
       await insertPostToServer({
         data: {
+          id,
           title,
           createdAt: createdAt.toISOString(),
         },
@@ -33,7 +37,7 @@ export const addPost = async (title: string) => {
     }
   }
 
-  return postId;
+  return id;
 };
 
 function RouteComponent() {
@@ -54,7 +58,9 @@ function RouteComponent() {
   return (
     <div className="p-4">
       <div className="mb-4">
-        <Link to="/client" className="text-blue-500 hover:underline">Go to Client</Link>
+        <Link to="/client" className="text-blue-500 hover:underline">
+          Go to Client
+        </Link>
       </div>
 
       <div className="mb-6">
@@ -67,17 +73,23 @@ function RouteComponent() {
             className="border p-2 flex-1"
             required
           />
-          <button type="submit" className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+          <button
+            type="submit"
+            className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+          >
             Add to Server
           </button>
         </form>
         <p className="text-sm text-gray-600 mt-1">
-          Posts are saved to DexieDB immediately. If online, also saved to server.
+          Posts are saved to DexieDB immediately. If online, also saved to
+          server.
         </p>
       </div>
 
       <div>
-        <h3 className="text-lg font-semibold mb-2">Posts from Server: {posts.length}</h3>
+        <h3 className="text-lg font-semibold mb-2">
+          Posts from Server: {posts.length}
+        </h3>
         {posts.length === 0 ? (
           <p className="text-gray-500">No posts yet. Add one above!</p>
         ) : (

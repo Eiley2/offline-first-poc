@@ -1,20 +1,23 @@
 import { getPostsFromClient, insertPostToServer } from "@/db/query";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { dexieDb } from "@/lib/dexie";
+import { ulid } from "ulid";
 
 export const Route = createFileRoute("/_synced/client")({
   component: RouteComponent,
   loader: () => getPostsFromClient(),
-  ssr: false
+  ssr: false,
 });
 
 export const addPost = async (title: string) => {
   const createdAt = new Date();
+  const id = ulid();
 
   // Always save to dexieDb (local storage)
-  const postId = await dexieDb.posts.add({
+  await dexieDb.posts.add({
+    id,
     title,
-    createdAt
+    createdAt,
   });
 
   // If online, also save to server
@@ -23,6 +26,7 @@ export const addPost = async (title: string) => {
     try {
       await insertPostToServer({
         data: {
+          id,
           title,
           createdAt: createdAt.toISOString(),
         },
@@ -32,7 +36,7 @@ export const addPost = async (title: string) => {
     }
   }
 
-  return postId;
+  return id;
 };
 
 function RouteComponent() {
@@ -50,11 +54,15 @@ function RouteComponent() {
   return (
     <div className="p-4">
       <div className="mb-4">
-        <Link to="/server" className="text-blue-500 hover:underline">Go to Server</Link>
+        <Link to="/server" className="text-blue-500 hover:underline">
+          Go to Server
+        </Link>
       </div>
 
       <div className="mb-6">
-        <h2 className="text-xl font-bold mb-2">Add Post (Client Only - DexieDB)</h2>
+        <h2 className="text-xl font-bold mb-2">
+          Add Post (Client Only - DexieDB)
+        </h2>
         <form onSubmit={handleSubmit} className="flex gap-2">
           <input
             type="text"
@@ -63,14 +71,19 @@ function RouteComponent() {
             className="border p-2 flex-1"
             required
           />
-          <button type="submit" className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+          <button
+            type="submit"
+            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+          >
             Add to Client
           </button>
         </form>
       </div>
 
       <div>
-        <h3 className="text-lg font-semibold mb-2">Posts from Client (DexieDB): {posts.length}</h3>
+        <h3 className="text-lg font-semibold mb-2">
+          Posts from Client (DexieDB): {posts.length}
+        </h3>
         {posts.length === 0 ? (
           <p className="text-gray-500">No posts yet. Add one above!</p>
         ) : (

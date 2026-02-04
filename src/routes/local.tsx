@@ -1,4 +1,4 @@
-import { getTodos, syncOnReconnect } from "@/db/query";
+import { getTodos, syncTodosWithServerPriority } from "@/db/query";
 import { dexieDb } from "@/lib/dexie";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
@@ -28,7 +28,7 @@ export function RouteComponent() {
       // If we were offline and now we're online, sync
       if (wasOffline.current) {
         console.log("Reconnected! Syncing...");
-        const result = await syncOnReconnect();
+        const result = await syncTodosWithServerPriority();
         console.log("Sync result:", result);
 
         if (result.synced) {
@@ -55,8 +55,11 @@ export function RouteComponent() {
     e.preventDefault();
     const formData = new FormData(e.target as HTMLFormElement);
     const title = formData.get("title") as string;
+    const { ulid } = await import("ulid");
     await dexieDb.todos.add({
+      id: ulid(),
       title,
+      completed: false,
       createdAt: new Date(),
     });
     router.invalidate();
