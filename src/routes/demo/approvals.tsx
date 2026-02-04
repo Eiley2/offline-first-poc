@@ -220,6 +220,7 @@ export const Route = createFileRoute("/demo/approvals")({
       }
 
       // Step 3: Push new local todos to server (that don't have pending changes tracked)
+      const justCreatedOnServer: string[] = [];
       for (const localTodo of localTodos) {
         const existsOnServer = serverTodos.find((st) => st.id === localTodo.id);
         if (!existsOnServer && !pendingChanges.has(localTodo.id)) {
@@ -233,9 +234,27 @@ export const Route = createFileRoute("/demo/approvals")({
                 createdAt: localTodo.createdAt.toISOString(),
               },
             });
+            justCreatedOnServer.push(localTodo.id);
           } catch (error) {
             console.error("Failed to create todo on server:", error);
           }
+        }
+      }
+
+      // Step 4: Delete local todos that no longer exist on server (were deleted by another client)
+      // Only delete if:
+      // - There's no pending change for this item
+      // - We didn't just create it on the server in Step 3
+      for (const localTodo of localTodos) {
+        const existsOnServer = serverTodos.find((st) => st.id === localTodo.id);
+        const hasPendingChange = pendingChanges.has(localTodo.id);
+        const wasJustCreated = justCreatedOnServer.includes(localTodo.id);
+
+        if (!existsOnServer && !hasPendingChange && !wasJustCreated) {
+          console.log(
+            `[Loader] 🗑️ Deleting ${localTodo.title} - no longer exists on server`
+          );
+          await dexieDb.todos.delete(localTodo.id);
         }
       }
 
@@ -285,9 +304,18 @@ function ApprovalsPage() {
       setSseConnected(true);
     });
 
-    es.addEventListener("todo-change", (e) => {
+    es.addEventListener("todo-change", async (e) => {
       const event: TodoChangeEvent = JSON.parse(e.data);
       console.log("[SSE] Todo change received:", event);
+
+      // Handle different event types
+      if (event.type === "deleted") {
+        // Delete locally immediately
+        console.log(`[SSE] Deleting todo ${event.todoId} locally`);
+        await dexieDb.todos.delete(event.todoId);
+        // Also remove from pending changes if exists
+        pendingChanges.delete(event.todoId);
+      }
 
       // Refresh data when we receive a change from another client
       router.invalidate();
