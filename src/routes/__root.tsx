@@ -5,6 +5,7 @@ import {
 } from "@tanstack/react-router";
 
 import appCss from "../styles.css?url";
+import { PWARegister } from "../components/pwa-register";
 
 import type { QueryClient } from "@tanstack/react-query";
 
@@ -23,13 +24,29 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
         content: "width=device-width, initial-scale=1",
       },
       {
-        title: "TanStack Start Starter",
+        name: "description",
+        content: "Sistema de aprobaciones offline-first",
+      },
+      {
+        name: "theme-color",
+        content: "#ffffff",
+      },
+      {
+        title: "Sistema de Aprobaciones",
       },
     ],
     links: [
       {
         rel: "stylesheet",
         href: appCss,
+      },
+      {
+        rel: "manifest",
+        href: "/manifest.json",
+      },
+      {
+        rel: "apple-touch-icon",
+        href: "/logo192.png",
       },
     ],
   }),
@@ -45,6 +62,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         {children}
+        <PWARegister />
         {/* <TanStackDevtools
           config={{
             position: "bottom-right",

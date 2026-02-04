@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { ulid } from "ulid";
 import { pendingChanges } from "@/lib/pending-changes";
-import { sseStream } from "./sse";
+import { sseStream } from "./-sse";
 import type { TodoChangeEvent } from "@/lib/sse-broadcast";
 
 // Helper to sync with server - returns true if successful

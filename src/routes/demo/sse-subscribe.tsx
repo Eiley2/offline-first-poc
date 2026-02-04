@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { sseStream } from "./sse";
+import { sseStream } from "./-sse";
 
 type SSEMessage = {
   message?: string;
