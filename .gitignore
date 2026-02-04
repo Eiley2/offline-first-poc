@@ -12,3 +12,7 @@ count.txt
 .vinxi
 todos.json
 data/
+
+# Traefik
+traefik/acme.json
+traefik/*.log
