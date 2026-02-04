@@ -14,6 +14,7 @@ import { Route as DemoRouteRouteImport } from './routes/demo/route'
 import { Route as SyncedRouteRouteImport } from './routes/_synced/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DemoIndexRouteImport } from './routes/demo/index'
+import { Route as DemoSseSubscribeRouteImport } from './routes/demo/sse-subscribe'
 import { Route as DemoApprovalsRouteImport } from './routes/demo/approvals'
 import { Route as SyncedServerRouteImport } from './routes/_synced/server'
 import { Route as SyncedClientRouteImport } from './routes/_synced/client'
@@ -41,6 +42,11 @@ const IndexRoute = IndexRouteImport.update({
 const DemoIndexRoute = DemoIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => DemoRouteRoute,
+} as any)
+const DemoSseSubscribeRoute = DemoSseSubscribeRouteImport.update({
+  id: '/sse-subscribe',
+  path: '/sse-subscribe',
   getParentRoute: () => DemoRouteRoute,
 } as any)
 const DemoApprovalsRoute = DemoApprovalsRouteImport.update({
@@ -71,6 +77,7 @@ export interface FileRoutesByFullPath {
   '/client': typeof SyncedClientRoute
   '/server': typeof SyncedServerRoute
   '/demo/approvals': typeof DemoApprovalsRoute
+  '/demo/sse-subscribe': typeof DemoSseSubscribeRoute
   '/demo/': typeof DemoIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
@@ -80,6 +87,7 @@ export interface FileRoutesByTo {
   '/client': typeof SyncedClientRoute
   '/server': typeof SyncedServerRoute
   '/demo/approvals': typeof DemoApprovalsRoute
+  '/demo/sse-subscribe': typeof DemoSseSubscribeRoute
   '/demo': typeof DemoIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
@@ -92,6 +100,7 @@ export interface FileRoutesById {
   '/_synced/client': typeof SyncedClientRoute
   '/_synced/server': typeof SyncedServerRoute
   '/demo/approvals': typeof DemoApprovalsRoute
+  '/demo/sse-subscribe': typeof DemoSseSubscribeRoute
   '/demo/': typeof DemoIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
@@ -104,6 +113,7 @@ export interface FileRouteTypes {
     | '/client'
     | '/server'
     | '/demo/approvals'
+    | '/demo/sse-subscribe'
     | '/demo/'
     | '/api/auth/$'
   fileRoutesByTo: FileRoutesByTo
@@ -113,6 +123,7 @@ export interface FileRouteTypes {
     | '/client'
     | '/server'
     | '/demo/approvals'
+    | '/demo/sse-subscribe'
     | '/demo'
     | '/api/auth/$'
   id:
@@ -124,6 +135,7 @@ export interface FileRouteTypes {
     | '/_synced/client'
     | '/_synced/server'
     | '/demo/approvals'
+    | '/demo/sse-subscribe'
     | '/demo/'
     | '/api/auth/$'
   fileRoutesById: FileRoutesById
@@ -173,6 +185,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DemoIndexRouteImport
       parentRoute: typeof DemoRouteRoute
     }
+    '/demo/sse-subscribe': {
+      id: '/demo/sse-subscribe'
+      path: '/sse-subscribe'
+      fullPath: '/demo/sse-subscribe'
+      preLoaderRoute: typeof DemoSseSubscribeRouteImport
+      parentRoute: typeof DemoRouteRoute
+    }
     '/demo/approvals': {
       id: '/demo/approvals'
       path: '/approvals'
@@ -220,11 +239,13 @@ const SyncedRouteRouteWithChildren = SyncedRouteRoute._addFileChildren(
 
 interface DemoRouteRouteChildren {
   DemoApprovalsRoute: typeof DemoApprovalsRoute
+  DemoSseSubscribeRoute: typeof DemoSseSubscribeRoute
   DemoIndexRoute: typeof DemoIndexRoute
 }
 
 const DemoRouteRouteChildren: DemoRouteRouteChildren = {
   DemoApprovalsRoute: DemoApprovalsRoute,
+  DemoSseSubscribeRoute: DemoSseSubscribeRoute,
   DemoIndexRoute: DemoIndexRoute,
 }
 
