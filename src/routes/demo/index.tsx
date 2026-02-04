@@ -1,8 +1,11 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { CheckCircle2, Clock, RefreshCw } from "lucide-react";
 
 export const Route = createFileRoute("/demo/")({
   component: DemoIndex,
+  loader: async () => {
+    throw redirect({ to: "/demo/approvals" });
+  },
 });
 
 function DemoIndex() {
