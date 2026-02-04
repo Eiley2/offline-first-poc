@@ -9,6 +9,7 @@ import { dexieDb } from "@/lib/dexie";
 import { posts, todos } from "./schema";
 import { ulid } from "ulid";
 import { eq } from "drizzle-orm";
+import { broadcastTodoChange } from "@/lib/sse-broadcast";
 
 export const getTodosFromServer = createServerFn({
   method: "GET",
@@ -105,6 +106,19 @@ export const insertTodoToServer = createServerFn({
       completed: data.completed,
       createdAt: new Date(data.createdAt),
     });
+
+    // Notify SSE clients about the new todo
+    broadcastTodoChange({
+      type: "created",
+      todoId: data.id,
+      data: {
+        id: data.id,
+        title: data.title,
+        completed: data.completed,
+      },
+      timestamp: Date.now(),
+    });
+
     return { success: true };
   });
 
@@ -118,6 +132,18 @@ export const updateTodoCompletedOnServer = createServerFn({
       .update(todos)
       .set({ completed: data.completed })
       .where(eq(todos.id, data.id));
+
+    // Notify SSE clients about the update
+    broadcastTodoChange({
+      type: "updated",
+      todoId: data.id,
+      data: {
+        id: data.id,
+        completed: data.completed,
+      },
+      timestamp: Date.now(),
+    });
+
     return { success: true };
   });
 

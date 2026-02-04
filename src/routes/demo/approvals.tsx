@@ -6,7 +6,7 @@ import {
   updateTodoCompleted,
   updateTodoCompletedOnServer,
 } from "@/db/query";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Trash2,
   CheckCircle2,
@@ -14,10 +14,12 @@ import {
   Clock,
   Wifi,
   WifiOff,
-  RefreshCw,
+  Radio,
 } from "lucide-react";
 import { ulid } from "ulid";
 import { pendingChanges } from "@/lib/pending-changes";
+import { sseStream } from "./sse";
+import type { TodoChangeEvent } from "@/lib/sse-broadcast";
 
 // Helper to sync with server - returns true if successful
 async function syncWithServer(): Promise<{
@@ -211,49 +213,8 @@ function ApprovalsPage() {
   const [newItemTitle, setNewItemTitle] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [pendingCount, setPendingCount] = useState(pendingChanges.size);
-  const [lastSyncResult, setLastSyncResult] = useState<
-    "success" | "failed" | null
-  >(null);
-
-  // Manual sync function
-  const handleManualSync = useCallback(async () => {
-    if (isSyncing) return;
-
-    setIsSyncing(true);
-    setLastSyncResult(null);
-    console.log("🔄 Manual sync triggered...");
-
-    try {
-      // Check if server is reachable first
-      const { success } = await syncWithServer();
-
-      if (success) {
-        // Server is reachable, invalidate to trigger full sync
-        await router.invalidate();
-        setPendingCount(pendingChanges.size);
-        setIsOnline(true);
-        setLastSyncResult("success");
-        console.log("✅ Manual sync completed");
-      } else {
-        // Server not reachable
-        setIsOnline(false);
-        setLastSyncResult("failed");
-        console.log("❌ Server not reachable");
-      }
-    } catch (error) {
-      console.error("❌ Manual sync failed:", error);
-      setLastSyncResult("failed");
-    } finally {
-      setIsSyncing(false);
-    }
-  }, [router, isSyncing]);
-
-  // Update pending count when items change
-  useEffect(() => {
-    setPendingCount(pendingChanges.size);
-  }, [items]);
+  const [sseConnected, setSseConnected] = useState(false);
+  const eventSourceRef = useRef<EventSource | null>(null);
 
   // Check server connectivity on mount
   useEffect(() => {
@@ -264,11 +225,45 @@ function ApprovalsPage() {
     checkConnectivity();
   }, []);
 
+  // SSE subscription for real-time updates
   useEffect(() => {
-    const handleOnline = async () => {
+    const es = new EventSource(sseStream.url);
+    eventSourceRef.current = es;
+
+    es.addEventListener("connected", (e) => {
+      console.log("[SSE] Connected:", JSON.parse(e.data));
+      setSseConnected(true);
+    });
+
+    es.addEventListener("todo-change", (e) => {
+      const event: TodoChangeEvent = JSON.parse(e.data);
+      console.log("[SSE] Todo change received:", event);
+
+      // Refresh data when we receive a change from another client
+      router.invalidate();
+    });
+
+    es.addEventListener("heartbeat", () => {
+      // Keep-alive, no action needed
+    });
+
+    es.onerror = () => {
+      console.log("[SSE] Connection error");
+      setSseConnected(false);
+    };
+
+    return () => {
+      es.close();
+      eventSourceRef.current = null;
+      setSseConnected(false);
+    };
+  }, [router]);
+
+  useEffect(() => {
+    const handleOnline = () => {
       console.log("🌐 Online event triggered!");
-      // Verify actual connectivity
-      await handleManualSync();
+      setIsOnline(true);
+      router.invalidate();
     };
 
     const handleOffline = () => {
@@ -283,7 +278,7 @@ function ApprovalsPage() {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
     };
-  }, [handleManualSync]);
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -333,7 +328,6 @@ function ApprovalsPage() {
     try {
       // Track as pending change (will be synced on next sync)
       pendingChanges.set(id, { completed: true, timestamp: Date.now() });
-      setPendingCount(pendingChanges.size);
       console.log(`[handleApprove] Pending changes: ${pendingChanges.size}`);
 
       await updateTodoCompleted(id, true);
@@ -354,7 +348,6 @@ function ApprovalsPage() {
     try {
       // Track as pending change (will be synced on next sync)
       pendingChanges.set(id, { completed: false, timestamp: Date.now() });
-      setPendingCount(pendingChanges.size);
       console.log(`[handleReject] Pending changes: ${pendingChanges.size}`);
 
       await updateTodoCompleted(id, false);
@@ -391,35 +384,24 @@ function ApprovalsPage() {
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-3xl font-bold text-gray-900">Aprobaciones</h1>
           <div className="flex items-center gap-3">
-            {/* Sync button */}
-            <button
-              onClick={handleManualSync}
-              disabled={isSyncing}
-              className={`px-3 py-1.5 text-sm font-medium rounded-full flex items-center gap-1.5 transition-colors disabled:opacity-50 ${
-                lastSyncResult === "success"
-                  ? "bg-green-100 text-green-700 hover:bg-green-200"
-                  : lastSyncResult === "failed"
-                    ? "bg-red-100 text-red-700 hover:bg-red-200"
-                    : "bg-blue-100 text-blue-700 hover:bg-blue-200"
+            {/* SSE Status */}
+            <span
+              className={`px-3 py-1 text-sm font-medium rounded-full flex items-center gap-1.5 ${
+                sseConnected
+                  ? "bg-purple-100 text-purple-700"
+                  : "bg-gray-100 text-gray-500"
               }`}
-              title="Sincronizar con servidor"
+              title={
+                sseConnected
+                  ? "Recibiendo actualizaciones en tiempo real"
+                  : "Sin conexión en tiempo real"
+              }
             >
-              <RefreshCw
-                className={`w-4 h-4 ${isSyncing ? "animate-spin" : ""}`}
+              <Radio
+                className={`w-4 h-4 ${sseConnected ? "animate-pulse" : ""}`}
               />
-              {isSyncing
-                ? "Sincronizando..."
-                : lastSyncResult === "success"
-                  ? "Sincronizado"
-                  : lastSyncResult === "failed"
-                    ? "Sin conexión"
-                    : "Sincronizar"}
-              {pendingCount > 0 && (
-                <span className="ml-1 px-1.5 py-0.5 bg-orange-600 text-white text-xs rounded-full">
-                  {pendingCount}
-                </span>
-              )}
-            </button>
+              {sseConnected ? "En vivo" : "Offline"}
+            </span>
 
             {isOnline ? (
               <span className="px-3 py-1 bg-green-100 text-green-700 text-sm font-medium rounded-full flex items-center gap-1.5">
