@@ -1,18 +1,18 @@
-import { defineConfig } from 'vite'
-import { devtools } from '@tanstack/devtools-vite'
-import { tanstackStart } from '@tanstack/react-start/plugin/vite'
-import viteReact from '@vitejs/plugin-react'
-import viteTsConfigPaths from 'vite-tsconfig-paths'
-import { fileURLToPath, URL } from 'url'
+import { defineConfig } from "vite";
+import { devtools } from "@tanstack/devtools-vite";
+import { tanstackStart } from "@tanstack/react-start/plugin/vite";
+import viteReact from "@vitejs/plugin-react";
+import viteTsConfigPaths from "vite-tsconfig-paths";
+import { fileURLToPath, URL } from "url";
 
-import tailwindcss from '@tailwindcss/vite'
-import { nitro } from 'nitro/vite'
-import { VitePWA } from 'vite-plugin-pwa'
+import tailwindcss from "@tailwindcss/vite";
+import { nitro } from "nitro/vite";
+import { VitePWA } from "vite-plugin-pwa";
 
 const config = defineConfig({
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
   plugins: [
@@ -20,44 +20,61 @@ const config = defineConfig({
     nitro(),
     // this is the plugin that enables path aliases
     viteTsConfigPaths({
-      projects: ['./tsconfig.json'],
+      projects: ["./tsconfig.json"],
     }),
     tailwindcss(),
     tanstackStart(),
     viteReact(),
     VitePWA({
-      registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'logo192.png', 'logo512.png'],
+      registerType: "autoUpdate",
+      includeAssets: ["favicon.ico", "logo192.png", "logo512.png"],
       manifest: {
-        name: 'Sistema de Aprobaciones',
-        short_name: 'Aprobaciones',
-        description: 'Sistema de aprobaciones offline-first',
-        theme_color: '#ffffff',
-        background_color: '#ffffff',
-        display: 'standalone',
-        scope: '/',
-        start_url: '/',
+        name: "Sistema de Aprobaciones",
+        short_name: "Aprobaciones",
+        description: "Sistema de aprobaciones offline-first",
+        theme_color: "#ffffff",
+        background_color: "#ffffff",
+        display: "standalone",
+        scope: "/",
+        start_url: "/",
+        orientation: "portrait-primary",
         icons: [
           {
-            src: 'logo192.png',
-            sizes: '192x192',
-            type: 'image/png',
+            src: "logo192.png",
+            sizes: "192x192",
+            type: "image/png",
+            purpose: "any",
           },
           {
-            src: 'logo512.png',
-            sizes: '512x512',
-            type: 'image/png',
+            src: "logo512.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "any",
+          },
+        ],
+        screenshots: [
+          {
+            src: "logo512.png",
+            sizes: "512x512",
+            type: "image/png",
+            form_factor: "narrow",
+          },
+          {
+            src: "logo512.png",
+            sizes: "512x512",
+            type: "image/png",
+            form_factor: "wide",
           },
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2}"],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
-            handler: 'CacheFirst',
+            handler: "CacheFirst",
             options: {
-              cacheName: 'google-fonts-cache',
+              cacheName: "google-fonts-cache",
               expiration: {
                 maxEntries: 10,
                 maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year
@@ -69,9 +86,9 @@ const config = defineConfig({
           },
           {
             urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
-            handler: 'CacheFirst',
+            handler: "CacheFirst",
             options: {
-              cacheName: 'gstatic-fonts-cache',
+              cacheName: "gstatic-fonts-cache",
               expiration: {
                 maxEntries: 10,
                 maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year
@@ -83,9 +100,9 @@ const config = defineConfig({
           },
           {
             urlPattern: /\/api\/.*/i,
-            handler: 'NetworkFirst',
+            handler: "NetworkFirst",
             options: {
-              cacheName: 'api-cache',
+              cacheName: "api-cache",
               networkTimeoutSeconds: 10,
               expiration: {
                 maxEntries: 50,
@@ -100,10 +117,10 @@ const config = defineConfig({
       },
       devOptions: {
         enabled: true,
-        type: 'module',
+        type: "module",
       },
     }),
   ],
-})
+});
 
-export default config
+export default config;
