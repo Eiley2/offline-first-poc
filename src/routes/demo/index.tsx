@@ -3,7 +3,7 @@ import { CheckCircle2, Clock, RefreshCw } from "lucide-react";
 
 export const Route = createFileRoute("/demo/")({
   component: DemoIndex,
-  loader: async () => {
+  beforeLoad: async () => {
     throw redirect({ to: "/demo/approvals" });
   },
 });
