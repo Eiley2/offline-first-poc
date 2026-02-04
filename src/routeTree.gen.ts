@@ -15,6 +15,7 @@ import { Route as SyncedRouteRouteImport } from './routes/_synced/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DemoIndexRouteImport } from './routes/demo/index'
 import { Route as DemoApprovalsRouteImport } from './routes/demo/approvals'
+import { Route as ApiSseRouteImport } from './routes/api/sse'
 import { Route as SyncedServerRouteImport } from './routes/_synced/server'
 import { Route as SyncedClientRouteImport } from './routes/_synced/client'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
@@ -48,6 +49,11 @@ const DemoApprovalsRoute = DemoApprovalsRouteImport.update({
   path: '/approvals',
   getParentRoute: () => DemoRouteRoute,
 } as any)
+const ApiSseRoute = ApiSseRouteImport.update({
+  id: '/api/sse',
+  path: '/api/sse',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SyncedServerRoute = SyncedServerRouteImport.update({
   id: '/server',
   path: '/server',
@@ -70,6 +76,7 @@ export interface FileRoutesByFullPath {
   '/local': typeof LocalRoute
   '/client': typeof SyncedClientRoute
   '/server': typeof SyncedServerRoute
+  '/api/sse': typeof ApiSseRoute
   '/demo/approvals': typeof DemoApprovalsRoute
   '/demo/': typeof DemoIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -79,6 +86,7 @@ export interface FileRoutesByTo {
   '/local': typeof LocalRoute
   '/client': typeof SyncedClientRoute
   '/server': typeof SyncedServerRoute
+  '/api/sse': typeof ApiSseRoute
   '/demo/approvals': typeof DemoApprovalsRoute
   '/demo': typeof DemoIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -91,6 +99,7 @@ export interface FileRoutesById {
   '/local': typeof LocalRoute
   '/_synced/client': typeof SyncedClientRoute
   '/_synced/server': typeof SyncedServerRoute
+  '/api/sse': typeof ApiSseRoute
   '/demo/approvals': typeof DemoApprovalsRoute
   '/demo/': typeof DemoIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -103,6 +112,7 @@ export interface FileRouteTypes {
     | '/local'
     | '/client'
     | '/server'
+    | '/api/sse'
     | '/demo/approvals'
     | '/demo/'
     | '/api/auth/$'
@@ -112,6 +122,7 @@ export interface FileRouteTypes {
     | '/local'
     | '/client'
     | '/server'
+    | '/api/sse'
     | '/demo/approvals'
     | '/demo'
     | '/api/auth/$'
@@ -123,6 +134,7 @@ export interface FileRouteTypes {
     | '/local'
     | '/_synced/client'
     | '/_synced/server'
+    | '/api/sse'
     | '/demo/approvals'
     | '/demo/'
     | '/api/auth/$'
@@ -133,6 +145,7 @@ export interface RootRouteChildren {
   SyncedRouteRoute: typeof SyncedRouteRouteWithChildren
   DemoRouteRoute: typeof DemoRouteRouteWithChildren
   LocalRoute: typeof LocalRoute
+  ApiSseRoute: typeof ApiSseRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
@@ -179,6 +192,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/demo/approvals'
       preLoaderRoute: typeof DemoApprovalsRouteImport
       parentRoute: typeof DemoRouteRoute
+    }
+    '/api/sse': {
+      id: '/api/sse'
+      path: '/api/sse'
+      fullPath: '/api/sse'
+      preLoaderRoute: typeof ApiSseRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_synced/server': {
       id: '/_synced/server'
@@ -237,6 +257,7 @@ const rootRouteChildren: RootRouteChildren = {
   SyncedRouteRoute: SyncedRouteRouteWithChildren,
   DemoRouteRoute: DemoRouteRouteWithChildren,
   LocalRoute: LocalRoute,
+  ApiSseRoute: ApiSseRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 export const routeTree = rootRouteImport

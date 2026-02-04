@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { ulid } from "ulid";
 import { pendingChanges } from "@/lib/pending-changes";
+import { useTodoPolling } from "@/hooks/useTodoPolling";
 
 // Helper to sync with server - returns true if successful
 async function syncWithServer(): Promise<{
@@ -216,6 +217,16 @@ function ApprovalsPage() {
   const [lastSyncResult, setLastSyncResult] = useState<
     "success" | "failed" | null
   >(null);
+
+  // Polling for real-time updates (checks every 5 seconds)
+  useTodoPolling({
+    enabled: isOnline,
+    interval: 500, // Check every 5 seconds
+    onTodoChange: useCallback(() => {
+      console.log("[Polling] Change detected, refreshing data...");
+      router.invalidate();
+    }, [router]),
+  });
 
   // Manual sync function
   const handleManualSync = useCallback(async () => {

@@ -105,6 +105,15 @@ export const insertTodoToServer = createServerFn({
       completed: data.completed,
       createdAt: new Date(data.createdAt),
     });
+
+    // Notify change tracker
+    try {
+      const { notifyTodoChange } = await import("@/lib/change-tracker");
+      notifyTodoChange();
+    } catch (error) {
+      console.error("Failed to notify change tracker:", error);
+    }
+
     return { success: true };
   });
 
@@ -118,8 +127,25 @@ export const updateTodoCompletedOnServer = createServerFn({
       .update(todos)
       .set({ completed: data.completed })
       .where(eq(todos.id, data.id));
+
+    // Notify change tracker
+    try {
+      const { notifyTodoChange } = await import("@/lib/change-tracker");
+      notifyTodoChange();
+    } catch (error) {
+      console.error("Failed to notify change tracker:", error);
+    }
+
     return { success: true };
   });
+
+// Get last change timestamp
+export const getLastChangeTimestamp = createServerFn({
+  method: "GET",
+}).handler(async () => {
+  const { getLastChangeTimestamp } = await import("@/lib/change-tracker");
+  return { timestamp: getLastChangeTimestamp() };
+});
 
 // Update todo completed status (client-side)
 export const updateTodoCompleted = createClientOnlyFn(
