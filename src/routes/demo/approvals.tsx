@@ -511,7 +511,7 @@ function ApprovalsPage() {
             value={newItemTitle}
             onChange={(e) => setNewItemTitle(e.target.value)}
             placeholder="Agregar nueva solicitud..."
-            className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
+            className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
             disabled={isSubmitting}
           />
           <button
