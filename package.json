@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev --port 3000",
-    "build": "vite build",
+    "build": "vite build && node scripts/generate-sw.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
@@ -59,6 +59,7 @@
     "vite-plugin-pwa": "^1.2.0",
     "vitest": "^3.2.4",
     "web-vitals": "^5.1.0",
+    "workbox-build": "^7.4.0",
     "workbox-window": "^7.4.0"
   }
 }

@@ -27,6 +27,7 @@ const config = defineConfig({
     viteReact(),
     VitePWA({
       registerType: "autoUpdate",
+      outDir: ".output/public",
       includeAssets: ["favicon.ico", "logo192.png", "logo512.png"],
       manifest: {
         name: "Sistema de Aprobaciones",
@@ -68,7 +69,10 @@ const config = defineConfig({
         ],
       },
       workbox: {
+        globDirectory: ".output/public",
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2}"],
+        swDest: ".output/public/sw.js",
+        navigateFallback: null,
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
