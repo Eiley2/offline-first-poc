@@ -147,6 +147,42 @@ export const updateTodoCompletedOnServer = createServerFn({
     return { success: true };
   });
 
+// Delete todo from server
+export const deleteTodoFromServer = createServerFn({
+  method: "POST",
+})
+  .inputValidator((data: { id: string }) => data)
+  .handler(async ({ data }) => {
+    await db.delete(todos).where(eq(todos.id, data.id));
+
+    // Notify SSE clients about the deletion
+    broadcastTodoChange({
+      type: "deleted",
+      todoId: data.id,
+      timestamp: Date.now(),
+    });
+
+    return { success: true };
+  });
+
+// Delete todo (client-side with server sync)
+export const deleteTodo = createClientOnlyFn(async (id: string) => {
+  console.log(`[deleteTodo] Deleting ${id}`);
+
+  // Always delete from Dexie first (works offline)
+  await dexieDb.todos.delete(id);
+  console.log(`[deleteTodo] ✅ Local delete successful`);
+
+  // Try to delete on server (will fail silently if offline)
+  try {
+    await deleteTodoFromServer({ data: { id } });
+    console.log(`[deleteTodo] ✅ Server delete successful`);
+  } catch (error) {
+    console.log(`[deleteTodo] ⚠️ Server delete failed (offline?):`, error);
+    // TODO: Track pending deletes for sync later
+  }
+});
+
 // Update todo completed status (client-side)
 export const updateTodoCompleted = createClientOnlyFn(
   async (id: string, completed: boolean) => {

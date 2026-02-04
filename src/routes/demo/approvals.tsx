@@ -5,12 +5,12 @@ import {
   insertTodoToServer,
   updateTodoCompleted,
   updateTodoCompletedOnServer,
+  deleteTodo,
 } from "@/db/query";
 import { useState, useEffect, useRef } from "react";
 import {
   Trash2,
   CheckCircle2,
-  XCircle,
   Clock,
   Wifi,
   WifiOff,
@@ -35,8 +35,58 @@ async function syncWithServer(): Promise<{
   }
 }
 
+function LoadingSkeleton() {
+  return (
+    <div className="max-w-4xl mx-auto p-4 sm:p-8 animate-pulse">
+      {/* Header Skeleton */}
+      <div className="mb-6 sm:mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-2">
+          <div className="h-7 sm:h-9 w-40 sm:w-48 bg-gray-200 rounded-lg" />
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="h-6 sm:h-7 w-8 sm:w-20 bg-gray-200 rounded-full" />
+            <div className="h-6 sm:h-7 w-8 sm:w-24 bg-gray-200 rounded-full" />
+          </div>
+        </div>
+        <div className="h-4 sm:h-5 w-full sm:w-96 bg-gray-200 rounded mt-2" />
+      </div>
+
+      {/* Form Skeleton */}
+      <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row gap-2 sm:gap-3">
+        <div className="flex-1 h-10 sm:h-12 bg-gray-200 rounded-lg" />
+        <div className="h-10 sm:h-12 w-full sm:w-28 bg-gray-200 rounded-lg" />
+      </div>
+
+      {/* Section Title Skeleton */}
+      <div className="mb-3 sm:mb-4 flex items-center gap-2">
+        <div className="h-4 w-4 sm:h-5 sm:w-5 bg-gray-200 rounded" />
+        <div className="h-5 sm:h-6 w-32 sm:w-56 bg-gray-200 rounded" />
+      </div>
+
+      {/* Items Skeleton */}
+      <div className="space-y-3">
+        {[1, 2, 3].map((i) => (
+          <div
+            key={i}
+            className="bg-white border border-gray-200 rounded-lg p-3 sm:p-4"
+          >
+            <div className="flex items-start justify-between gap-2 mb-3">
+              <div className="flex-1">
+                <div className="h-4 sm:h-5 w-3/4 bg-gray-200 rounded mb-2" />
+                <div className="h-3 sm:h-4 w-24 sm:w-40 bg-gray-200 rounded" />
+              </div>
+              <div className="h-7 sm:h-9 w-7 sm:w-9 bg-gray-200 rounded" />
+            </div>
+            <div className="h-9 w-full bg-gray-200 rounded-lg" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export const Route = createFileRoute("/demo/approvals")({
   component: ApprovalsPage,
+  pendingComponent: LoadingSkeleton,
   loader: async () => {
     console.log("[Loader] Starting...");
 
@@ -343,34 +393,22 @@ function ApprovalsPage() {
     }
   };
 
-  const handleReject = async (id: string) => {
-    console.log(`[handleReject] Starting rejection for ${id}`);
-    try {
-      // Track as pending change (will be synced on next sync)
-      pendingChanges.set(id, { completed: false, timestamp: Date.now() });
-      console.log(`[handleReject] Pending changes: ${pendingChanges.size}`);
-
-      await updateTodoCompleted(id, false);
-      console.log(
-        `[handleReject] updateTodoCompleted finished, invalidating...`
-      );
-
-      await router.invalidate();
-      console.log(`[handleReject] ✅ Rejection complete`);
-    } catch (error) {
-      console.error("❌ Error rejecting item:", error);
-      alert(`Error al rechazar: ${error}`);
-    }
-  };
-
   const handleDelete = async (id: string) => {
     if (!confirm("¿Eliminar este elemento?")) return;
 
+    console.log(`[handleDelete] Starting deletion for ${id}`);
     try {
-      await dexieDb.todos.delete(id);
-      router.invalidate();
+      // Remove from pending changes if exists
+      pendingChanges.delete(id);
+
+      // Delete locally and try to sync with server
+      await deleteTodo(id);
+      console.log(`[handleDelete] ✅ Deletion complete`);
+
+      await router.invalidate();
     } catch (error) {
-      console.error("Error deleting item:", error);
+      console.error("❌ Error deleting item:", error);
+      alert(`Error al eliminar: ${error}`);
     }
   };
 
@@ -378,15 +416,17 @@ function ApprovalsPage() {
   const approvedItems = items.filter((item) => item.completed);
 
   return (
-    <div className="max-w-4xl mx-auto p-8">
+    <div className="max-w-4xl mx-auto p-4 sm:p-8">
       {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-2">
-          <h1 className="text-3xl font-bold text-gray-900">Aprobaciones</h1>
-          <div className="flex items-center gap-3">
+      <div className="mb-6 sm:mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-2">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+            Aprobaciones
+          </h1>
+          <div className="flex items-center gap-2 sm:gap-3">
             {/* SSE Status */}
             <span
-              className={`px-3 py-1 text-sm font-medium rounded-full flex items-center gap-1.5 ${
+              className={`px-2 sm:px-3 py-1 text-xs sm:text-sm font-medium rounded-full flex items-center gap-1 sm:gap-1.5 ${
                 sseConnected
                   ? "bg-purple-100 text-purple-700"
                   : "bg-gray-100 text-gray-500"
@@ -398,32 +438,34 @@ function ApprovalsPage() {
               }
             >
               <Radio
-                className={`w-4 h-4 ${sseConnected ? "animate-pulse" : ""}`}
+                className={`w-3 h-3 sm:w-4 sm:h-4 ${sseConnected ? "animate-pulse" : ""}`}
               />
-              {sseConnected ? "En vivo" : "Offline"}
+              <span className="hidden xs:inline">
+                {sseConnected ? "En vivo" : "Offline"}
+              </span>
             </span>
 
             {isOnline ? (
-              <span className="px-3 py-1 bg-green-100 text-green-700 text-sm font-medium rounded-full flex items-center gap-1.5">
-                <Wifi className="w-4 h-4" />
-                Conectado
+              <span className="px-2 sm:px-3 py-1 bg-green-100 text-green-700 text-xs sm:text-sm font-medium rounded-full flex items-center gap-1 sm:gap-1.5">
+                <Wifi className="w-3 h-3 sm:w-4 sm:h-4" />
+                <span className="hidden xs:inline">Conectado</span>
               </span>
             ) : (
-              <span className="px-3 py-1 bg-orange-100 text-orange-700 text-sm font-medium rounded-full flex items-center gap-1.5">
-                <WifiOff className="w-4 h-4" />
-                Sin conexión
+              <span className="px-2 sm:px-3 py-1 bg-orange-100 text-orange-700 text-xs sm:text-sm font-medium rounded-full flex items-center gap-1 sm:gap-1.5">
+                <WifiOff className="w-3 h-3 sm:w-4 sm:h-4" />
+                <span className="hidden xs:inline">Sin conexión</span>
               </span>
             )}
           </div>
         </div>
-        <p className="text-gray-600">
+        <p className="text-sm sm:text-base text-gray-600">
           Gestiona las aprobaciones de solicitudes. Puedes aprobar o rechazar
           elementos incluso sin conexión.
         </p>
         {!isOnline && (
-          <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
-            <p className="text-sm text-orange-800 flex items-center gap-2">
-              <WifiOff className="w-4 h-4" />
+          <div className="mt-3 p-2 sm:p-3 bg-orange-50 border border-orange-200 rounded-lg">
+            <p className="text-xs sm:text-sm text-orange-800 flex items-center gap-2">
+              <WifiOff className="w-4 h-4 shrink-0" />
               <span>
                 Trabajando sin conexión. Tus aprobaciones se sincronizarán
                 automáticamente al reconectar.
@@ -434,27 +476,27 @@ function ApprovalsPage() {
       </div>
 
       {/* Add Item Form */}
-      <form onSubmit={handleSubmit} className="mb-8">
-        <div className="flex gap-3">
+      <form onSubmit={handleSubmit} className="mb-6 sm:mb-8">
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
           <input
             type="text"
             value={newItemTitle}
             onChange={(e) => setNewItemTitle(e.target.value)}
             placeholder="Agregar nueva solicitud..."
-            className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
             disabled={isSubmitting}
           />
           <button
             type="submit"
             disabled={isSubmitting || !newItemTitle.trim()}
-            className="px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 sm:px-6 py-2.5 sm:py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
           >
             {isSubmitting ? "Agregando..." : "Agregar"}
           </button>
         </div>
         {!isOnline && (
-          <p className="text-sm text-orange-600 mt-2 flex items-center gap-1.5">
-            <WifiOff className="w-4 h-4" />
+          <p className="text-xs sm:text-sm text-orange-600 mt-2 flex items-center gap-1.5">
+            <WifiOff className="w-4 h-4 shrink-0" />
             Sin conexión: La solicitud se sincronizará automáticamente cuando
             vuelva la conexión
           </p>
@@ -462,32 +504,34 @@ function ApprovalsPage() {
       </form>
 
       {/* Pending Items */}
-      <div className="mb-8">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-          <Clock className="w-5 h-5 text-orange-600" />
-          Pendientes de Aprobación ({pendingItems.length})
+      <div className="mb-6 sm:mb-8">
+        <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
+          <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-orange-600" />
+          Pendientes ({pendingItems.length})
         </h2>
         <div className="space-y-3">
           {pendingItems.length === 0 ? (
-            <div className="text-center py-8 bg-white border border-gray-200 rounded-lg">
-              <p className="text-gray-500">No hay elementos pendientes</p>
+            <div className="text-center py-6 sm:py-8 bg-white border border-gray-200 rounded-lg">
+              <p className="text-gray-500 text-sm sm:text-base">
+                No hay elementos pendientes
+              </p>
             </div>
           ) : (
             pendingItems.map((item) => (
               <div
                 key={item.id}
-                className="bg-white border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors"
+                className="bg-white border border-gray-200 rounded-lg p-3 sm:p-4 hover:border-gray-300 transition-colors"
               >
-                <div className="flex items-start gap-3">
-                  {/* Content */}
+                {/* Content */}
+                <div className="flex items-start justify-between gap-2 mb-3">
                   <div className="flex-1 min-w-0">
-                    <p className="text-gray-900 font-medium">{item.title}</p>
-                    <p className="text-sm text-gray-500 mt-1">
-                      Creado:{" "}
+                    <p className="text-sm sm:text-base text-gray-900 font-medium break-words">
+                      {item.title}
+                    </p>
+                    <p className="text-xs sm:text-sm text-gray-500 mt-1">
                       {(item.createdAt ?? new Date()).toLocaleDateString(
                         "es-ES",
                         {
-                          year: "numeric",
                           month: "short",
                           day: "numeric",
                           hour: "2-digit",
@@ -496,31 +540,22 @@ function ApprovalsPage() {
                       )}
                     </p>
                   </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleApprove(item.id)}
-                      className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors flex items-center gap-1.5"
-                    >
-                      <CheckCircle2 className="w-4 h-4" />
-                      Aprobar
-                    </button>
-                    <button
-                      onClick={() => handleReject(item.id)}
-                      className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors flex items-center gap-1.5"
-                    >
-                      <XCircle className="w-4 h-4" />
-                      Rechazar
-                    </button>
-                    <button
-                      onClick={() => handleDelete(item.id)}
-                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => handleDelete(item.id)}
+                    className="p-1.5 sm:p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors shrink-0"
+                  >
+                    <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
+                  </button>
                 </div>
+
+                {/* Action Button */}
+                <button
+                  onClick={() => handleApprove(item.id)}
+                  className="w-full px-3 py-2 bg-green-600 text-white text-xs sm:text-sm font-medium rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-1.5"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  Aprobar
+                </button>
               </div>
             ))
           )}
@@ -530,27 +565,31 @@ function ApprovalsPage() {
       {/* Approved Items */}
       {approvedItems.length > 0 && (
         <div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <CheckCircle2 className="w-5 h-5 text-green-600" />
+          <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
             Aprobados ({approvedItems.length})
           </h2>
           <div className="space-y-3">
             {approvedItems.map((item) => (
               <div
                 key={item.id}
-                className="bg-green-50 border border-green-200 rounded-lg p-4"
+                className="bg-green-50 border border-green-200 rounded-lg p-3 sm:p-4"
               >
-                <div className="flex items-start gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                <div className="flex items-start gap-2 sm:gap-3">
+                  <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 shrink-0 mt-0.5" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-gray-900 font-medium">{item.title}</p>
-                    <p className="text-sm text-gray-600 mt-1">Aprobado</p>
+                    <p className="text-sm sm:text-base text-gray-900 font-medium break-words">
+                      {item.title}
+                    </p>
+                    <p className="text-xs sm:text-sm text-gray-600 mt-1">
+                      Aprobado
+                    </p>
                   </div>
                   <button
                     onClick={() => handleDelete(item.id)}
-                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                    className="p-1.5 sm:p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors shrink-0"
                   >
-                    <Trash2 className="w-5 h-5" />
+                    <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
                   </button>
                 </div>
               </div>
@@ -561,17 +600,17 @@ function ApprovalsPage() {
 
       {/* Stats */}
       {items.length > 0 && (
-        <div className="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-          <div className="flex items-center justify-between text-sm">
+        <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-gray-50 border border-gray-200 rounded-lg">
+          <div className="flex items-center justify-between text-xs sm:text-sm">
             <span className="text-gray-600">
               Total: <strong className="text-gray-900">{items.length}</strong>
             </span>
             <span className="text-gray-600">
-              Pendientes:{" "}
+              Pend:{" "}
               <strong className="text-gray-900">{pendingItems.length}</strong>
             </span>
             <span className="text-gray-600">
-              Aprobados:{" "}
+              Aprob:{" "}
               <strong className="text-gray-900">{approvedItems.length}</strong>
             </span>
           </div>
